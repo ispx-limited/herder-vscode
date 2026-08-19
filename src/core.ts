@@ -30,7 +30,10 @@ export function yamlContext(lineToCursor: string): CompletionContext | null {
   if (!m) return null;
   const [, key, value] = m;
   if (key === "canonical") return { kind: "canonical", prefix: value };
-  return classify(value);
+  // The key already says this value is a parameter path, so complete
+  // from the first character; the dot heuristic in classify() exists
+  // only for bare string literals where nothing marks the intent.
+  return { kind: "parameter", prefix: value };
 }
 
 // Inside a TS string literal, complete canonical names and parameter

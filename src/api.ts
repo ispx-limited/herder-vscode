@@ -44,6 +44,17 @@ export class HerderClient {
     return (await res.json()) as Suggestion[];
   }
 
+  // The distinct data-model roots of the fleet's discovered models,
+  // for completing the start of a path before the suggest endpoint's
+  // three-character floor is reachable.
+  async modelRoots(): Promise<string[]> {
+    const url = `${this.baseUrl}/api/v1/schema/models?limit=100`;
+    const res = await fetch(url, { headers: this.headers() });
+    if (!res.ok) throw new Error(`models: HTTP ${res.status}`);
+    const body = (await res.json()) as { data: { root_object: string }[] };
+    return [...new Set(body.data.map((m) => m.root_object).filter(Boolean))];
+  }
+
   // Exact-parity validation: the same registry-driven validator the
   // sync path runs. An invalid buffer is a 200 with ok:false; a 4xx is
   // transport or auth, never a verdict on the content.
