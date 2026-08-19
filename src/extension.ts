@@ -20,10 +20,34 @@ export function activate(context: vscode.ExtensionContext): void {
   let meta = new MetaStore(config().get<string>("metaBaseUrl", ""));
   let client: HerderClient | null = null;
 
+  // Silent-when-unconfigured wasted a real operator's evening: the
+  // status bar now states the extension's mode whenever a config file
+  // has focus, so "nothing happens" always has a visible reason.
+  const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
+  context.subscriptions.push(status);
+  function updateStatus(): void {
+    const doc = vscode.window.activeTextEditor?.document;
+    if (!doc || !isConfigDocument(doc)) {
+      status.hide();
+      return;
+    }
+    if (client) {
+      status.text = "Herder: ready";
+      status.tooltip = `Completion and validation against ${config().get<string>("apiUrl", "")}`;
+    } else {
+      status.text = "Herder: set herder.apiUrl";
+      status.tooltip =
+        "herder.apiUrl is empty in this workspace, so API completion and validation are disabled. Envelope completion still works.";
+    }
+    status.show();
+  }
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateStatus));
+
   async function rebuildClient(): Promise<void> {
     const url = config().get<string>("apiUrl", "").replace(/\/+$/, "");
     const token = (await context.secrets.get(TOKEN_KEY)) ?? "";
     client = url ? new HerderClient(url, token) : null;
+    updateStatus();
   }
   void rebuildClient();
 
@@ -66,7 +90,12 @@ export function activate(context: vscode.ExtensionContext): void {
         document.languageId === "yaml" ? yamlContext(line) : tsStringContext(line);
       if (!ctx) return undefined;
       try {
-        return await completionsFor(ctx);
+        const items = await completionsFor(ctx);
+        // Parameter lists are a server-side page of a much larger set;
+        // marking them incomplete makes every keystroke re-query with
+        // the longer prefix instead of client-filtering the first page,
+        // which silently hides everything past the alphabetical head.
+        return new vscode.CompletionList(items, ctx.kind === "parameter");
       } catch {
         return undefined; // completion never surfaces errors; validation does
       }
@@ -83,6 +112,22 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   async function completionsFor(ctx: CompletionContext): Promise<vscode.CompletionItem[]> {
+    // Envelope completion needs only the published registry, so it
+    // works before any API URL is configured.
+    if (ctx.kind === "resourceKind" || ctx.kind === "apiVersion") {
+      const kinds = await meta.getKinds();
+      if (ctx.kind === "resourceKind") {
+        return kinds.map((k) => {
+          const item = new vscode.CompletionItem(k.kind, vscode.CompletionItemKind.Class);
+          item.detail = `${k.apiVersion}, domain ${k.domain}`;
+          return item;
+        });
+      }
+      const seen = new Set<string>();
+      return kinds
+        .filter((k) => (seen.has(k.apiVersion) ? false : seen.add(k.apiVersion)))
+        .map((k) => new vscode.CompletionItem(k.apiVersion, vscode.CompletionItemKind.Module));
+    }
     if (ctx.kind === "canonical") {
       const names = await meta.getCanonicals();
       return names

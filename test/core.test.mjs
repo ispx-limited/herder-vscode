@@ -87,3 +87,17 @@ test("issuePosition prefers structured position, falls back to the message", () 
     { line: 1, column: 1 },
   );
 });
+
+test("yamlContext completes the envelope keys", () => {
+  assert.deepEqual(yamlContext("kind: Telem"), { kind: "resourceKind", prefix: "Telem" });
+  assert.deepEqual(yamlContext("kind: "), { kind: "resourceKind", prefix: "" });
+  assert.deepEqual(yamlContext("apiVersion: telemetry.her"), { kind: "apiVersion", prefix: "telemetry.her" });
+  assert.equal(yamlContext("  kind: Telem"), null); // envelope keys are top-level only
+});
+
+test("issuePosition parses yaml parse-error line numbers", () => {
+  assert.deepEqual(
+    issuePosition({ scope: "current_file", file: "a.yaml", message: "doc 0: yaml: yaml: line 8: found unexpected end of stream", line: null, column: null }),
+    { line: 8, column: 1 },
+  );
+});
