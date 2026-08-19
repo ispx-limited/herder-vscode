@@ -2,7 +2,13 @@
 
 export type CompletionContext =
   | { kind: "canonical"; prefix: string }
-  | { kind: "parameter"; prefix: string };
+  | { kind: "parameter"; prefix: string }
+  | { kind: "resourceKind"; prefix: string }
+  | { kind: "apiVersion"; prefix: string };
+
+// The envelope keys complete from the kind registry, so the editor
+// works without any second YAML extension.
+const ENVELOPE_VALUE = /^(kind|apiVersion)\s*:\s*["']?([\w./-]*)$/;
 
 // A dotted data-model path: at least one dot, segments of word chars
 // plus the {i} instance wildcard. Three chars minimum mirrors the
@@ -14,6 +20,12 @@ const PARAM_PREFIX = /^[A-Za-z][\w.{}-]{2,}$/;
 const YAML_VALUE = /(?:^|\s)(devicePath|path|canonical)\s*:\s*["']?([^"']*)$/;
 
 export function yamlContext(lineToCursor: string): CompletionContext | null {
+  const env = ENVELOPE_VALUE.exec(lineToCursor);
+  if (env) {
+    return env[1] === "kind"
+      ? { kind: "resourceKind", prefix: env[2] }
+      : { kind: "apiVersion", prefix: env[2] };
+  }
   const m = YAML_VALUE.exec(lineToCursor);
   if (!m) return null;
   const [, key, value] = m;
@@ -121,5 +133,10 @@ export function issuePosition(issue: ValidationIssue): { line: number; column: n
   }
   const m = /\((\d+):(\d+)\)/.exec(issue.message);
   if (m) return { line: parseInt(m[1], 10), column: parseInt(m[2], 10) };
+  // YAML parse errors carry only "line N" ("yaml: line 8: found
+  // unexpected end of stream"); anchoring those at line 1 paints the
+  // squiggle on apiVersion while the problem is at the cursor.
+  const y = /line (\d+)/.exec(issue.message);
+  if (y) return { line: parseInt(y[1], 10), column: 1 };
   return { line: 1, column: 1 };
 }
