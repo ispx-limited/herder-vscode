@@ -90,7 +90,12 @@ export function activate(context: vscode.ExtensionContext): void {
         document.languageId === "yaml" ? yamlContext(line) : tsStringContext(line);
       if (!ctx) return undefined;
       try {
-        return await completionsFor(ctx);
+        const items = await completionsFor(ctx);
+        // Parameter lists are a server-side page of a much larger set;
+        // marking them incomplete makes every keystroke re-query with
+        // the longer prefix instead of client-filtering the first page,
+        // which silently hides everything past the alphabetical head.
+        return new vscode.CompletionList(items, ctx.kind === "parameter");
       } catch {
         return undefined; // completion never surfaces errors; validation does
       }
