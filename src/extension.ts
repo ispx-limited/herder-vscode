@@ -3,7 +3,9 @@ import { HerderClient, MetaStore } from "./api";
 import {
   issuePosition,
   scriptDomain,
+  templatedLabel,
   tsStringContext,
+  wildcardQueryPrefix,
   yamlContext,
   yamlDomains,
   type CompletionContext,
@@ -89,8 +91,17 @@ export function activate(context: vscode.ExtensionContext): void {
       const ctx =
         document.languageId === "yaml" ? yamlContext(line) : tsStringContext(line);
       if (!ctx) return undefined;
+      // Replace the whole typed prefix on accept. Without an explicit
+      // range VS Code replaces only the word at the cursor, and dotted
+      // paths have no word there, so accepting appended the full path
+      // after the prefix the operator had already typed.
+      const replaceRange = new vscode.Range(
+        position.translate(0, -Math.min(ctx.prefix.length, position.character)),
+        position,
+      );
       try {
         const items = await completionsFor(ctx);
+        for (const it of items) it.range = replaceRange;
         // Parameter lists are a server-side page of a much larger set;
         // marking them incomplete makes every keystroke re-query with
         // the longer prefix instead of client-filtering the first page,
@@ -140,10 +151,11 @@ export function activate(context: vscode.ExtensionContext): void {
         });
     }
     if (!client) return [];
-    const suggestions = await client.suggest(ctx.prefix);
+    const queryPrefix = wildcardQueryPrefix(ctx.prefix);
+    const suggestions = await client.suggest(queryPrefix);
     return suggestions.map((s) => {
       const item = new vscode.CompletionItem(
-        s.path,
+        templatedLabel(ctx.prefix, queryPrefix, s.path),
         s.is_object ? vscode.CompletionItemKind.Module : vscode.CompletionItemKind.Field,
       );
       item.detail = s.is_object ? "object" : s.writable ? "writable" : "read-only";
