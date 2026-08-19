@@ -154,3 +154,33 @@ export function wildcardQueryPrefix(prefix: string): string {
 export function templatedLabel(typedPrefix: string, queryPrefix: string, path: string): string {
   return path.startsWith(queryPrefix) ? typedPrefix + path.slice(queryPrefix.length) : path;
 }
+
+// Decode errors ("field X not found in type Y") report lines relative
+// to the first line after the document's `spec:` key, not the file.
+// Verified empirically: spec: at file line 5, offending field at file
+// line 8, reported as line 3. Parse errors and script positions keep
+// their own conventions and are handled in issuePosition.
+export function decodeErrorLine(buffer: string, message: string): number | null {
+  const dm = /^doc (\d+): .*decode error/.exec(message);
+  const lm = /line (\d+):/.exec(message);
+  if (!dm || !lm) return null;
+  const docIndex = parseInt(dm[1], 10);
+  const rel = parseInt(lm[1], 10);
+  const lines = buffer.split("\n");
+  let doc = 0;
+  let start = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^---\s*$/.test(lines[i])) {
+      doc++;
+      if (doc > docIndex) break;
+      start = i + 1;
+      continue;
+    }
+  }
+  if (doc < docIndex) return null;
+  for (let i = start; i < lines.length; i++) {
+    if (/^---\s*$/.test(lines[i]) && i > start) break;
+    if (/^spec\s*:/.test(lines[i])) return i + 1 + rel; // 1-based file line
+  }
+  return null;
+}

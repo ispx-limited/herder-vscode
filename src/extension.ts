@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { HerderClient, MetaStore } from "./api";
 import {
+  decodeErrorLine,
   issuePosition,
   scriptDomain,
   templatedLabel,
@@ -228,7 +229,8 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   function toDiagnostic(doc: vscode.TextDocument, issue: ValidationIssue): vscode.Diagnostic {
-    const pos = issuePosition(issue);
+    const decoded = decodeErrorLine(doc.getText(), issue.message);
+    const pos = decoded !== null ? { line: decoded, column: 1 } : issuePosition(issue);
     const line = Math.min(Math.max(pos.line - 1, 0), doc.lineCount - 1);
     const range = issue.scope === "current_file"
       ? doc.lineAt(line).range.with({ start: new vscode.Position(line, Math.max(pos.column - 1, 0)) })

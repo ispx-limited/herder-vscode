@@ -117,3 +117,21 @@ test("yaml path keys complete from the first character", () => {
   assert.deepEqual(yamlContext('    - path: "'), { kind: "parameter", prefix: "" });
   assert.deepEqual(yamlContext('      devicePath: "Int'), { kind: "parameter", prefix: "Int" });
 });
+
+test("decode errors anchor relative to the doc's spec block", async () => {
+  const { decodeErrorLine } = await import("../out/core.js");
+  const buf = [
+    "apiVersion: telemetry.herder.io/v1alpha1",
+    "kind: TelemetryProfile",
+    "metadata:",
+    "  name: router-deviceinfo",
+    "spec:",
+    "  priority: 50",
+    "  parameters:",
+    "    - name: wan_ip",
+    "      path: X",
+  ].join("\n");
+  const msg = 'doc 0: TelemetryProfile "router-deviceinfo" decode error: yaml: unmarshal errors:\n  line 3: field name not found in type telemetry.ProfileParameter';
+  assert.equal(decodeErrorLine(buf, msg), 8);
+  assert.equal(decodeErrorLine(buf, "doc 0: yaml: line 8: found unexpected end of stream"), null);
+});
