@@ -140,3 +140,14 @@ export function issuePosition(issue: ValidationIssue): { line: number; column: n
   if (y) return { line: parseInt(y[1], 10), column: 1 };
   return { line: 1, column: 1 };
 }
+
+// Instance wildcards: templates say WANDevice.{i}., the discovered
+// model stores WANDevice.1. — query a representative instance and
+// graft the typed wildcard prefix back onto each result.
+export function wildcardQueryPrefix(prefix: string): string {
+  return prefix.replace(/\{i\}/g, "1");
+}
+
+export function templatedLabel(typedPrefix: string, queryPrefix: string, path: string): string {
+  return path.startsWith(queryPrefix) ? typedPrefix + path.slice(queryPrefix.length) : path;
+}

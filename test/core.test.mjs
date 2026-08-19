@@ -101,3 +101,14 @@ test("issuePosition parses yaml parse-error line numbers", () => {
     { line: 8, column: 1 },
   );
 });
+
+test("wildcard prefixes query a representative instance and label as typed", async () => {
+  const { wildcardQueryPrefix, templatedLabel } = await import("../out/core.js");
+  const typed = "InternetGatewayDevice.WANDevice.{i}.WANCommon";
+  const q = wildcardQueryPrefix(typed);
+  assert.equal(q, "InternetGatewayDevice.WANDevice.1.WANCommon");
+  assert.equal(
+    templatedLabel(typed, q, "InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent"),
+    "InternetGatewayDevice.WANDevice.{i}.WANCommonInterfaceConfig.TotalBytesSent",
+  );
+});
