@@ -112,3 +112,8 @@ test("wildcard prefixes query a representative instance and label as typed", asy
     "InternetGatewayDevice.WANDevice.{i}.WANCommonInterfaceConfig.TotalBytesSent",
   );
 });
+
+test("yaml path keys complete from the first character", () => {
+  assert.deepEqual(yamlContext('    - path: "'), { kind: "parameter", prefix: "" });
+  assert.deepEqual(yamlContext('      devicePath: "Int'), { kind: "parameter", prefix: "Int" });
+});

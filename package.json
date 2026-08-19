@@ -2,7 +2,7 @@
   "name": "herder-vscode",
   "displayName": "Herder",
   "description": "Completion and validation for Herder config repos: parameter paths from the live schema repository, canonical names, and exact-parity validation of YAML and scripts",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "ispx",
   "license": "Apache-2.0",
   "repository": {

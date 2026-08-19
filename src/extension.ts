@@ -21,6 +21,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   let meta = new MetaStore(config().get<string>("metaBaseUrl", ""));
   let client: HerderClient | null = null;
+  let rootsCache: string[] | null = null;
 
   // Silent-when-unconfigured wasted a real operator's evening: the
   // status bar now states the extension's mode whenever a config file
@@ -49,6 +50,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const url = config().get<string>("apiUrl", "").replace(/\/+$/, "");
     const token = (await context.secrets.get(TOKEN_KEY)) ?? "";
     client = url ? new HerderClient(url, token) : null;
+    rootsCache = null;
     updateStatus();
   }
   void rebuildClient();
@@ -151,6 +153,19 @@ export function activate(context: vscode.ExtensionContext): void {
         });
     }
     if (!client) return [];
+    // Below the suggest floor (or before any dot), offer the fleet's
+    // discovered roots so a path can be started, not just continued.
+    if (ctx.prefix.length < 3 || !ctx.prefix.includes(".")) {
+      if (!rootsCache) rootsCache = await client.modelRoots();
+      return rootsCache
+        .filter((r) => r.toLowerCase().startsWith(ctx.prefix.toLowerCase()))
+        .map((r) => {
+          const item = new vscode.CompletionItem(r, vscode.CompletionItemKind.Module);
+          item.detail = "data-model root";
+          item.command = { command: "editor.action.triggerSuggest", title: "" };
+          return item;
+        });
+    }
     const queryPrefix = wildcardQueryPrefix(ctx.prefix);
     const suggestions = await client.suggest(queryPrefix);
     return suggestions.map((s) => {
